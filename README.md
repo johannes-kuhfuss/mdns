@@ -1,6 +1,7 @@
-# mdns
-[![Build Status](https://github.com/hashicorp/mdns/workflows/ci/badge.svg)](https://github.com/hashicorp/mdns/actions)
 
+# mdns
+
+!! Work in progress after forking !!
 Simple mDNS client/server library in Golang. mDNS or Multicast DNS can be
 used to discover services on the local network without the use of an authoritative
 DNS server. This enables peer-to-peer discovery. It is important to note that many
@@ -10,7 +11,9 @@ environment. However it works well in most office, home, or private infrastructu
 environments.
 
 Using the library is very simple, here is an example of publishing a service entry:
+
 ```go
+
 // Setup our service export
 host, _ := os.Hostname()
 info := []string{"My awesome service"}
@@ -22,7 +25,9 @@ defer server.Shutdown()
 ```
 
 Doing a lookup for service providers is also very simple:
+
 ```go
+
 // Make a channel for results and start listening
 entriesCh := make(chan *mdns.ServiceEntry, 4)
 go func() {
