@@ -179,7 +179,7 @@ func newClient(iface *net.Interface, v4 bool, v6 bool) (*client, error) {
 
 	// Establish multicast connections
 	if v4 {
-		conn, err := net.ListenPacket("udp4", ":5352")
+		conn, err := net.ListenPacket("udp4", ":5353")
 		if err != nil {
 			logger.Error("Failed to listen to multicast on IPv4", err)
 		} else {
@@ -208,7 +208,7 @@ func newClient(iface *net.Interface, v4 bool, v6 bool) (*client, error) {
 		}
 	}
 	if v6 {
-		conn, err := net.ListenPacket("udp6", "[::]:5352")
+		conn, err := net.ListenPacket("udp6", "[::]:5353")
 		if err != nil {
 			logger.Error("Failed to listen to multicast on IPv6", err)
 		} else {
