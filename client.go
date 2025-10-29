@@ -276,7 +276,7 @@ func (c *client) Close() error {
 		return nil
 	}
 
-	logger.Infof("[INFO] mdns: Closing client %v", *c)
+	logger.Infof("Closing client %v", *c)
 	close(c.closedCh)
 
 	if c.ipv4UnicastConn != nil {
@@ -294,34 +294,6 @@ func (c *client) Close() error {
 
 	return nil
 }
-
-// setInterface is used to set the query interface, uses system
-// default if not provided
-/*
-func (c *client) setInterface(iface *net.Interface) error {
-	if c.use_ipv4 {
-		p := ipv4.NewPacketConn(c.ipv4UnicastConn)
-		if err := p.SetMulticastInterface(iface); err != nil {
-			return err
-		}
-		p = ipv4.NewPacketConn(c.ipv4MulticastConn)
-		if err := p.SetMulticastInterface(iface); err != nil {
-			return err
-		}
-	}
-	if c.use_ipv6 {
-		p2 := ipv6.NewPacketConn(c.ipv6UnicastConn)
-		if err := p2.SetMulticastInterface(iface); err != nil {
-			return err
-		}
-		p2 = ipv6.NewPacketConn(c.ipv6MulticastConn)
-		if err := p2.SetMulticastInterface(iface); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-*/
 
 // msgAddr carries the message and source address from recv to message processing.
 type msgAddr struct {
