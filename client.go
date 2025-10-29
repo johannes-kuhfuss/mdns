@@ -83,7 +83,7 @@ func QueryContext(ctx context.Context, params *QueryParam) error {
 		params.Logger = log.Default()
 	}
 	// Create a new client
-	client, err := newClient(!params.DisableIPv4, !params.DisableIPv6, params.Logger)
+	client, err := newClient(params.Interface, !params.DisableIPv4, !params.DisableIPv6, params.Logger)
 	if err != nil {
 		return err
 	}
@@ -97,13 +97,6 @@ func QueryContext(ctx context.Context, params *QueryParam) error {
 			return
 		}
 	}()
-
-	// Set the multicast interface
-	if params.Interface != nil {
-		if err := client.setInterface(params.Interface); err != nil {
-			return err
-		}
-	}
 
 	// Ensure defaults are set
 	if params.Domain == "" {
@@ -144,7 +137,7 @@ type client struct {
 
 // NewClient creates a new mdns Client that can be used to query
 // for records
-func newClient(v4 bool, v6 bool, logger *log.Logger) (*client, error) {
+func newClient(iface *net.Interface, v4 bool, v6 bool, logger *log.Logger) (*client, error) {
 	if !v4 && !v6 {
 		return nil, fmt.Errorf("Must enable at least one of IPv4 and IPv6 querying")
 	}
@@ -156,8 +149,27 @@ func newClient(v4 bool, v6 bool, logger *log.Logger) (*client, error) {
 	var mconn4 *net.UDPConn
 	var mconn6 *net.UDPConn
 	var err error
+	var ifaces []*net.Interface
+	var joined bool
+
+	// Check interface, use all if none is given
+	if iface == nil {
+		allIfs, err := net.Interfaces()
+		if err != nil {
+			logger.Printf("Could not determine list of interfaces: %v", err)
+			return nil, err
+		}
+		for _, i := range allIfs {
+			if (i.Flags&net.FlagUp) != 0 && (i.Flags&net.FlagMulticast) != 0 {
+				ifaces = append(ifaces, &i)
+			}
+		}
+	} else {
+		ifaces = []*net.Interface{iface}
+	}
 
 	// Establish unicast connections
+	// JKU: determine whether there is benefits to binding only one IP here
 	if v4 {
 		uconn4, err = net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 		if err != nil {
@@ -176,15 +188,61 @@ func newClient(v4 bool, v6 bool, logger *log.Logger) (*client, error) {
 
 	// Establish multicast connections
 	if v4 {
-		mconn4, err = net.ListenMulticastUDP("udp4", nil, ipv4Addr)
+		conn, err := net.ListenPacket("udp4", ":5353")
 		if err != nil {
-			logger.Printf("[ERR] mdns: Failed to bind to udp4 port: %v", err)
+			logger.Printf("Failed to listen to multicast on IPv4: %v", err)
+		} else {
+			p := ipv4.NewPacketConn(conn)
+			joined = false
+			for _, i := range ifaces {
+				if err := p.JoinGroup(i, &net.UDPAddr{IP: net.ParseIP("224.0.0.251")}); err == nil {
+					joined = true
+					logger.Printf("joined IPv4 multicast on %s", iface.Name)
+				} else {
+					logger.Printf("failed to join IPv4 multicast on %s: %v", iface.Name, err)
+				}
+			}
+			if !joined {
+				logger.Printf("no interfaces joined IPv4 multicast group")
+			}
+			err = p.SetControlMessage(ipv4.FlagDst, true)
+			if err != nil {
+				logger.Printf("could not set control message")
+			}
+			err = p.SetMulticastLoopback(true)
+			if err != nil {
+				logger.Printf("could not set multicast loopback")
+			}
+			mconn4 = p.PacketConn.(*net.UDPConn)
 		}
 	}
 	if v6 {
-		mconn6, err = net.ListenMulticastUDP("udp6", nil, ipv6Addr)
+		conn, err := net.ListenPacket("udp6", "[::]:5353")
 		if err != nil {
-			logger.Printf("[ERR] mdns: Failed to bind to udp6 port: %v", err)
+			logger.Printf("Failed to listen to multicast on IPv6: %v", err)
+		} else {
+			p := ipv6.NewPacketConn(conn)
+			joined = false
+			for _, i := range ifaces {
+				if err := p.JoinGroup(i, &net.UDPAddr{IP: net.ParseIP("ff02::fb")}); err == nil {
+					joined = true
+					logger.Printf("joined IPv6 multicast on %s", iface.Name)
+				} else {
+					logger.Printf("failed to join IPv6 multicast on %s: %v", iface.Name, err)
+				}
+			}
+			if !joined {
+				logger.Printf("no interfaces joined IPv6 multicast group")
+			}
+			err = p.SetControlMessage(ipv6.FlagDst, true)
+			if err != nil {
+				logger.Printf("could not set control message")
+			}
+			err = p.SetMulticastLoopback(true)
+			if err != nil {
+				logger.Printf("could not set multicast loopback")
+			}
+			mconn6 = p.PacketConn.(*net.UDPConn)
 		}
 	}
 	if mconn4 == nil && mconn6 == nil {
@@ -250,6 +308,7 @@ func (c *client) Close() error {
 
 // setInterface is used to set the query interface, uses system
 // default if not provided
+/*
 func (c *client) setInterface(iface *net.Interface) error {
 	if c.use_ipv4 {
 		p := ipv4.NewPacketConn(c.ipv4UnicastConn)
@@ -273,6 +332,7 @@ func (c *client) setInterface(iface *net.Interface) error {
 	}
 	return nil
 }
+*/
 
 // msgAddr carries the message and source address from recv to message processing.
 type msgAddr struct {
