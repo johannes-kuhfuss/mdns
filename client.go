@@ -23,13 +23,10 @@ type ServiceEntry struct {
 	Name         string
 	Host         string
 	AddrV4       net.IP
-	AddrV6       net.IP // @Deprecated
 	AddrV6IPAddr *net.IPAddr
 	Port         int
 	Info         string
 	InfoFields   []string
-
-	Addr net.IP // @Deprecated
 
 	hasTXT bool
 	sent   bool
@@ -37,7 +34,7 @@ type ServiceEntry struct {
 
 // complete is used to check if we have all the info we need
 func (s *ServiceEntry) complete() bool {
-	return (s.AddrV4 != nil || s.AddrV6 != nil || s.Addr != nil) && s.Port != 0 && s.hasTXT
+	return (s.AddrV4 != nil) && s.Port != 0 && s.hasTXT
 }
 
 // QueryParam is used to customize how a Lookup is performed
@@ -407,14 +404,11 @@ func (c *client) query(params *QueryParam) error {
 				case *dns.A:
 					// Pull out the IP
 					inp = ensureName(inprogress, rr.Hdr.Name)
-					inp.Addr = rr.A // @Deprecated
 					inp.AddrV4 = rr.A
 
 				case *dns.AAAA:
 					// Pull out the IP
 					inp = ensureName(inprogress, rr.Hdr.Name)
-					inp.Addr = rr.AAAA   // @Deprecated
-					inp.AddrV6 = rr.AAAA // @Deprecated
 					inp.AddrV6IPAddr = &net.IPAddr{IP: rr.AAAA}
 					// link-local IPv6 addresses must be qualified with a zone (interface). Zone is
 					// specific to this machine/network-namespace and so won't be carried in the
