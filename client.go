@@ -158,6 +158,7 @@ func newClient(iface *net.Interface, v4 bool, v6 bool) (*client, error) {
 	} else {
 		ifaces = []*net.Interface{iface}
 	}
+	logger.Infof("Interfaces: %v", ifaces)
 
 	// Establish unicast connections
 	if v4 {
@@ -178,7 +179,7 @@ func newClient(iface *net.Interface, v4 bool, v6 bool) (*client, error) {
 
 	// Establish multicast connections
 	if v4 {
-		conn, err := net.ListenPacket("udp4", ":5353")
+		conn, err := net.ListenPacket("udp4", ":5352")
 		if err != nil {
 			logger.Error("Failed to listen to multicast on IPv4", err)
 		} else {
@@ -197,17 +198,17 @@ func newClient(iface *net.Interface, v4 bool, v6 bool) (*client, error) {
 			}
 			err = p.SetControlMessage(ipv4.FlagDst, true)
 			if err != nil {
-				logger.Warn("could not set control message")
+				logger.Warnf("could not set control message: %v", err)
 			}
 			err = p.SetMulticastLoopback(true)
 			if err != nil {
-				logger.Warn("could not set multicast loopback")
+				logger.Warnf("could not set multicast loopback: %v", err)
 			}
 			mconn4 = p.PacketConn.(*net.UDPConn)
 		}
 	}
 	if v6 {
-		conn, err := net.ListenPacket("udp6", "[::]:5353")
+		conn, err := net.ListenPacket("udp6", "[::]:5352")
 		if err != nil {
 			logger.Error("Failed to listen to multicast on IPv6", err)
 		} else {
@@ -226,11 +227,11 @@ func newClient(iface *net.Interface, v4 bool, v6 bool) (*client, error) {
 			}
 			err = p.SetControlMessage(ipv6.FlagDst, true)
 			if err != nil {
-				logger.Warn("could not set control message")
+				logger.Warnf("could not set control message: %v", err)
 			}
 			err = p.SetMulticastLoopback(true)
 			if err != nil {
-				logger.Warn("could not set multicast loopback")
+				logger.Warnf("could not set multicast loopback: %v", err)
 			}
 			mconn6 = p.PacketConn.(*net.UDPConn)
 		}
@@ -276,7 +277,7 @@ func (c *client) Close() error {
 		return nil
 	}
 
-	logger.Infof("Closing client %v", *c)
+	logger.Info("Closing client")
 	close(c.closedCh)
 
 	if c.ipv4UnicastConn != nil {
@@ -305,6 +306,7 @@ type msgAddr struct {
 func (c *client) query(params *QueryParam) error {
 	// Create the service name
 	serviceAddr := fmt.Sprintf("%s.%s.", trimDot(params.Service), trimDot(params.Domain))
+	logger.Infof("Service Address: %v", serviceAddr)
 
 	// Start listening for response packets
 	msgCh := make(chan *msgAddr, 32)
@@ -330,6 +332,7 @@ func (c *client) query(params *QueryParam) error {
 		m.Question[0].Qclass |= 1 << 15
 	}
 	m.RecursionDesired = false
+	logger.Infof("Sending query: %v", m)
 	if err := c.sendQuery(m); err != nil {
 		return err
 	}
@@ -345,6 +348,7 @@ func (c *client) query(params *QueryParam) error {
 			var inp *ServiceEntry
 			for _, answer := range append(resp.msg.Answer, resp.msg.Extra...) {
 				// TODO(reddaly): Check that response corresponds to serviceAddr?
+				logger.Infof("Answer: %v", answer)
 				switch rr := answer.(type) {
 				case *dns.PTR:
 					// Create new entry for this
@@ -403,6 +407,7 @@ func (c *client) query(params *QueryParam) error {
 				}
 			} else {
 				// Fire off a node specific query
+				logger.Info("Sending node-specific query")
 				m := new(dns.Msg)
 				m.SetQuestion(inp.Name, dns.TypePTR)
 				m.RecursionDesired = false
